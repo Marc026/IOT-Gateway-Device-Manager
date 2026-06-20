@@ -1,0 +1,4 @@
+build/
+*.o
+*.nvs
+*.nvs.compact_tmp

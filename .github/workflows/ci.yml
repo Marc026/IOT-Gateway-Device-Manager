@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (with sanitizers)
+        run: cmake -B build -DENABLE_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test (ASan + UBSan)
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Release build (no sanitizers, for size/perf sanity)
+        run: |
+          cmake -B build-release -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-release
+          size build-release/gateway_main
