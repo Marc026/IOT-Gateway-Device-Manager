@@ -1,0 +1,5 @@
+foreach(t state_machine nvs_store device_registry watchdog protocol)
+  add_executable(test_${t} test_${t}.c)
+  target_link_libraries(test_${t} gateway_core)
+  add_test(NAME ${t} COMMAND test_${t})
+endforeach()
