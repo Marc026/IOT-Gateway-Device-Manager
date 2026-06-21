@@ -9,7 +9,7 @@ struct gw_registry {
     uint16_t next_device_id;
 };
 
-static int find_index(struct gw_registry *reg, const uint8_t mac[GW_MAC_LEN]) {
+static int find_index(const struct gw_registry *reg, const uint8_t mac[GW_MAC_LEN]) {
     for (int i = 0; i < GW_MAX_DEVICES; i++) {
         if (reg->devices[i].in_use && memcmp(reg->devices[i].mac, mac, GW_MAC_LEN) == 0) {
             return i;
@@ -18,7 +18,7 @@ static int find_index(struct gw_registry *reg, const uint8_t mac[GW_MAC_LEN]) {
     return -1;
 }
 
-static int find_free_index(struct gw_registry *reg) {
+static int find_free_index(const struct gw_registry *reg) {
     for (int i = 0; i < GW_MAX_DEVICES; i++) {
         if (!reg->devices[i].in_use) return i;
     }

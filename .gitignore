@@ -1,4 +1,7 @@
 build/
+build-arm/
+build-fuzz/
+build-release/
 *.o
 *.nvs
 *.nvs.compact_tmp

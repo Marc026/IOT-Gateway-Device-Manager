@@ -10,7 +10,7 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Configure (with sanitizers)
         run: cmake -B build -DENABLE_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
@@ -26,3 +26,45 @@ jobs:
           cmake -B build-release -DCMAKE_BUILD_TYPE=Release
           cmake --build build-release
           size build-release/gateway_main
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install cppcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq cppcheck
+
+      - name: Run cppcheck
+        run: cppcheck --enable=warning,style,performance,portability --error-exitcode=1 -I include src/
+
+  cross-compile-arm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install ARM cross-compiler
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-arm-linux-gnueabihf
+
+      - name: Configure for armhf
+        run: cmake -B build-arm -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-arm-linux-gnueabihf.cmake
+
+      - name: Build for armhf
+        run: cmake --build build-arm
+
+      - name: Confirm ARM binary
+        run: file build-arm/gateway_main
+
+  fuzz-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure fuzz harness (Clang)
+        run: cmake -B build-fuzz -DCMAKE_C_COMPILER=clang -DENABLE_FUZZING=ON
+
+      - name: Build fuzz harness
+        run: cmake --build build-fuzz --target fuzz_protocol
+
+      - name: Run fuzzer (30s smoke test)
+        run: ./build-fuzz/fuzz_protocol -max_total_time=30

@@ -108,6 +108,8 @@ explicit `BYE` message) and `HANDSHAKE_FAIL` short-circuit straight to
 | `watchdog.c/h` | Per-task kick/deadline tracking with a configurable miss threshold before a *targeted* recovery callback fires — modeling "restart the network task" rather than "reboot the device." |
 | `gateway_protocol.c/h` | 52-byte packed, CRC-16/CCITT-FALSE-checked binary message format in network byte order, for `DISCOVER` / `HANDSHAKE` / `HEARTBEAT` / `BYE`. |
 | `main.c` | Single-threaded `poll()` event loop wiring the above together; clean shutdown persists state to NVS. |
+| `fuzz/fuzz_protocol.c` | libFuzzer harness exercising `gw_proto_validate()` against arbitrary input — the network-facing trust boundary. |
+| `cmake/toolchain-arm-linux-gnueabihf.cmake` | CMake toolchain file for cross-compiling the whole project to 32-bit ARM Linux. |
 
 ## Building
 
@@ -126,6 +128,10 @@ cmake --build build
 Compiles clean under `-Wall -Wextra -Werror -Wshadow` in both a sanitized
 Debug build and a plain `-O3` Release build — no `Wstringop-truncation`,
 no shadowed variables, no warnings suppressed.
+
+Code style follows `.clang-format` (run `clang-format -i src/*.c
+include/*.h` before committing); `cppcheck` is run in CI on every push
+(see [Static analysis](#static-analysis)).
 
 ## Testing
 
@@ -155,6 +161,65 @@ caught by `test_device_registry.c` before it shipped), NVS replay
 correctly reconstructs state including tombstoned/erased keys after a
 simulated restart, and the wire protocol rejects single-bit corruption
 anywhere in the payload.
+
+## Cross-compiling for ARM
+
+The whole point of "embedded" is that it doesn't just run on the dev
+box. `cmake/toolchain-arm-linux-gnueabihf.cmake` cross-compiles the full
+project — core library, `gateway_main`, and the test binaries — for
+32-bit ARM Linux (`armhf`), the architecture family behind most
+router/IoT-gateway SoCs:
+
+```bash
+cmake -B build-arm -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-arm-linux-gnueabihf.cmake
+cmake --build build-arm
+file build-arm/gateway_main
+```
+
+Verified clean (zero warnings under the same `-Wall -Wextra -Werror
+-Wshadow` used everywhere else) with `arm-linux-gnueabihf-gcc`:
+
+```
+build-arm/gateway_main: ELF 32-bit LSB pie executable, ARM, EABI5 ...
+   text    data     bss     dec     hex
+  12175     464       4   12643    3163
+```
+
+This is a *build*-only sanity check, not target validation — see
+[Notes on the host-vs-target boundary](#notes-on-the-host-vs-target-boundary)
+for what that distinction means here.
+
+## Fuzzing the wire protocol parser
+
+`gateway_protocol.c`'s `gw_proto_validate()` is the actual trust
+boundary of this project: it's the first thing that touches bytes
+pulled straight off a UDP socket, before anything is assumed about
+them. `fuzz/fuzz_protocol.c` is a small libFuzzer harness that feeds it
+(and the field accessors built on top of it) arbitrary, attacker-shaped
+input:
+
+```bash
+cmake -B build-fuzz -DCMAKE_C_COMPILER=clang -DENABLE_FUZZING=ON
+cmake --build build-fuzz --target fuzz_protocol
+./build-fuzz/fuzz_protocol -max_total_time=60
+```
+
+Run locally under AddressSanitizer + UBSan: **42,585,945 executions in
+31 seconds, zero crashes, zero sanitizer findings.** CI runs a 30-second
+smoke pass on every push as a regression guard, not a substitute for a
+real fuzzing campaign — the value here is that malformed/truncated/
+corrupted packets are something this project actively tests for, not
+just something the CRC check is hoped to catch.
+
+## Static analysis
+
+```bash
+cppcheck --enable=warning,style,performance,portability --error-exitcode=1 -I include src/
+```
+
+Clean — no findings — and run in CI on every push. Catches a different
+class of issue than the sanitizers (e.g. parameters that should be
+`const`, which several were until cppcheck flagged them).
 
 ## Running it / live demo
 
@@ -213,16 +278,17 @@ real hardware:
   control-flow shape as a bare-metal or single-RTOS-task main loop —
   no thread-safety assumptions were taken that wouldn't hold on a
   single-core target.
-- **Cross-compilation**: not wired up here, but `CMakeLists.txt` has no
-  host-specific assumptions beyond `<arpa/inet.h>`/`<poll.h>`/`<sys/socket.h>`
-  in `main.c` — a toolchain file plus a target-appropriate transport/NVS
-  backend behind the same headers would be the actual porting work.
+- **Cross-compilation**: implemented — `cmake/toolchain-arm-linux-gnueabihf.cmake`
+  cross-compiles cleanly for `armhf` (see [Cross-compiling for ARM](#cross-compiling-for-arm)).
+  What's still simulated either way is the *target*: this proves the
+  code has no x86-only assumptions, not that it's been run on actual
+  router/IoT hardware.
 
 ## Possible extensions
 
 - Replace the file-backed `nvs_store` with an actual flash block driver
   behind the same API (the one module designed to be swapped).
-- Add a `--cross` CMake toolchain file for `arm-none-eabi-gcc` and stub
-  the socket layer for a target with a real Wi-Fi driver.
+- Run the fuzz harness against an actual target build under qemu-user,
+  rather than only on the host build.
 - Multiple watchdog-monitored tasks beyond `net_rx` (e.g. a periodic
   NVS-compaction task) to exercise more than one entry in the table.

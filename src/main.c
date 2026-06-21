@@ -40,7 +40,7 @@ static void on_net_wdt_fire(void *ctx) {
      * here in simulation. */
 }
 
-static void persist_registry(gw_registry_t *reg, gw_nvs_t *nvs) {
+static void persist_registry(const gw_registry_t *reg, gw_nvs_t *nvs) {
     uint8_t blob[4096];
     size_t n = gw_registry_serialize(reg, blob, sizeof(blob));
     if (n == 0 && gw_registry_count(reg) > 0) {
@@ -108,7 +108,7 @@ int main(void) {
                 memcpy(host, pkt.hostname, hlen);
                 host[hlen] = '\0';
 
-                gw_device_t *dev = gw_registry_touch(reg, pkt.mac, host, t);
+                const gw_device_t *dev = gw_registry_touch(reg, pkt.mac, host, t);
                 if (dev) {
                     switch (pkt.msg_type) {
                         case GW_MSG_DISCOVER:

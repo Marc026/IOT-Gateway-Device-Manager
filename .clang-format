@@ -1,0 +1,17 @@
+# Style for this project: 4-space indent, K&R-ish braces, conservative
+# line length. Matches the formatting the code was already written in;
+# this file exists so that's enforced rather than incidental.
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Inline
+AlignConsecutiveDeclarations: false
+AlignTrailingComments: true
+PointerAlignment: Right
+SpaceBeforeParens: ControlStatements
+IndentCaseLabels: true
+SortIncludes: false

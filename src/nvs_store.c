@@ -20,14 +20,14 @@ struct gw_nvs {
     nvs_cache_entry_t entries[NVS_MAX_ENTRIES];
 };
 
-static int find_slot(struct gw_nvs *nvs, const char *key) {
+static int find_slot(const struct gw_nvs *nvs, const char *key) {
     for (int i = 0; i < NVS_MAX_ENTRIES; i++) {
         if (nvs->entries[i].used && strcmp(nvs->entries[i].key, key) == 0) return i;
     }
     return -1;
 }
 
-static int find_free_slot(struct gw_nvs *nvs) {
+static int find_free_slot(const struct gw_nvs *nvs) {
     for (int i = 0; i < NVS_MAX_ENTRIES; i++) {
         if (!nvs->entries[i].used) return i;
     }
