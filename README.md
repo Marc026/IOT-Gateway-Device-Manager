@@ -35,6 +35,30 @@ protocol, and `main.c` runs it all from a single-threaded `poll()` loop —
 the same shape as a typical embedded event loop, just without an RTOS
 underneath it.
 
+## Tech Stack
+
+| Layer | Tools |
+|---|---|
+| Language | C11 |
+| Build system | CMake 3.16+ |
+| Compilers | GCC (Debug/Release/ARM builds), Clang 18 (required for the fuzz harness) |
+| Networking | Hand-rolled binary protocol over UDP sockets (POSIX), network byte order, CRC-16/CCITT-FALSE |
+| Storage | Custom log-structured key/value store (flash/NVS emulation, no external library) |
+| Testing | Custom ~20-line assert/count harness, CTest, AddressSanitizer + UndefinedBehaviorSanitizer |
+| Fuzzing | libFuzzer (via Clang) |
+| Static analysis | cppcheck |
+| Style | clang-format |
+| Cross-compilation | `arm-linux-gnueabihf-gcc` (armhf toolchain) |
+| CI/CD | GitHub Actions (4 jobs: build+test, static-analysis, cross-compile-arm, fuzz-smoke-test) |
+| Tooling | Python 3 (`device_sim.py` — independent protocol reimplementation used for integration testing) |
+| License | MIT |
+
+No third-party C library appears anywhere in the core — CRC, log-structured
+storage, the state machine, and the test harness are all written from
+scratch. That's a deliberate constraint, not an oversight: minimizing
+dependencies matters far more on a target with a real flash budget than
+it does on a host build.
+
 ## Architecture
 
 ```
